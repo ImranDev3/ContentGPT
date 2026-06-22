@@ -33,6 +33,11 @@ const envSchema = z.object({
   MANIFEST_MODEL: z.string().min(1).default('auto'),
   PORT: z.coerce.number().int().positive().default(8787),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+
+  // Optional: Google Programmable Search (better web results than DDG).
+  // If unset, the backend uses DuckDuckGo Instant Answer (no key required).
+  GOOGLE_API_KEY: z.string().optional(),
+  GOOGLE_CSE_ID: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

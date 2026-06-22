@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/cjs/styles/prism';
-import { Check, Copy, User, Bot } from 'lucide-react';
+import { Check, Copy, FileText, User, Bot } from 'lucide-react';
 import type { ChatMessage } from '@/types/chat';
 import { cn } from '@/lib/utils';
 
@@ -18,17 +18,6 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message, isStreaming, useDarkTheme }: MessageBubbleProps) {
   const isUser = message.role === 'user';
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(message.content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* no-op */
-    }
-  }
 
   return (
     <div className={cn('group flex w-full gap-3 px-4 py-5', isUser ? 'justify-end' : 'justify-start')}>
@@ -91,35 +80,11 @@ export function MessageBubble({ message, isStreaming, useDarkTheme }: MessageBub
                       );
                     }
                     return (
-                      <div className="overflow-hidden rounded-md border border-border/60">
-                        <div className="flex items-center justify-between border-b border-border/60 bg-muted/50 px-3 py-1 text-[11px] text-muted-foreground">
-                          <span>{match[1]}</span>
-                          <button
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(text);
-                              } catch {
-                                /* no-op */
-                              }
-                            }}
-                            className="rounded px-1.5 py-0.5 hover:bg-accent"
-                          >
-                            Copy
-                          </button>
-                        </div>
-                        <SyntaxHighlighter
-                          language={match[1]}
-                          style={useDarkTheme ? (oneDark as Record<string, React.CSSProperties>) : (oneLight as Record<string, React.CSSProperties>)}
-                          customStyle={{
-                            margin: 0,
-                            padding: '0.9em 1em',
-                            background: 'transparent',
-                            fontSize: '0.85rem',
-                          }}
-                        >
-                          {text}
-                        </SyntaxHighlighter>
-                      </div>
+                      <CodeBlock
+                        language={match[1]}
+                        code={text}
+                        useDarkTheme={useDarkTheme}
+                      />
                     );
                   },
                 }}
@@ -130,18 +95,8 @@ export function MessageBubble({ message, isStreaming, useDarkTheme }: MessageBub
           )}
         </div>
 
-        {!isUser && message.content && (
-          <button
-            onClick={handleCopy}
-            className={cn(
-              'flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground',
-              'opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100',
-            )}
-            aria-label="Copy message"
-          >
-            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
+        {!isUser && message.content && !isStreaming && (
+          <MessageActions content={message.content} />
         )}
       </div>
 
@@ -152,4 +107,148 @@ export function MessageBubble({ message, isStreaming, useDarkTheme }: MessageBub
       )}
     </div>
   );
+}
+
+/**
+ * Action bar shown below every assistant message: "Copy" (plain text) and
+ * "Copy markdown". Both always visible — no hover required.
+ */
+function MessageActions({ content }: { content: string }) {
+  const [copied, setCopied] = useState<'plain' | 'md' | null>(null);
+
+  useEffect(() => {
+    if (copied === null) return;
+    const t = setTimeout(() => setCopied(null), 1500);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  async function copy(as: 'plain' | 'md') {
+    const text = as === 'plain' ? stripMarkdown(content) : content;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(as);
+    } catch {
+      /* no-op */
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <ActionButton
+        label={copied === 'plain' ? 'Copied' : 'Copy'}
+        onClick={() => copy('plain')}
+        active={copied === 'plain'}
+        icon={<Copy className="h-3 w-3" />}
+      />
+      <ActionButton
+        label={copied === 'md' ? 'Copied' : 'Copy markdown'}
+        onClick={() => copy('md')}
+        active={copied === 'md'}
+        icon={<FileText className="h-3 w-3" />}
+      />
+    </div>
+  );
+}
+
+function ActionButton({
+  label,
+  onClick,
+  active,
+  icon,
+}: {
+  label: string;
+  onClick: () => void;
+  active: boolean;
+  icon: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex items-center gap-1 rounded-md border border-border bg-background/70 px-2 py-1',
+        'text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors',
+        active && 'border-primary/40 text-foreground',
+      )}
+      aria-label={label}
+    >
+      {active ? <Check className="h-3 w-3" /> : icon}
+      {label}
+    </button>
+  );
+}
+
+/**
+ * Markdown-fenced code block with a "Copy" button on the header. Always
+ * visible so users can grab snippets without hovering.
+ */
+function CodeBlock({
+  language,
+  code,
+  useDarkTheme,
+}: {
+  language: string;
+  code: string;
+  useDarkTheme: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+    } catch {
+      /* no-op */
+    }
+  }
+
+  return (
+    <div className="overflow-hidden rounded-md border border-border/60">
+      <div className="flex items-center justify-between border-b border-border/60 bg-muted/50 px-3 py-1 text-[11px] text-muted-foreground">
+        <span className="font-mono">{language}</span>
+        <button
+          onClick={handleCopy}
+          className={cn(
+            'flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-accent transition-colors',
+            copied && 'text-foreground',
+          )}
+        >
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <SyntaxHighlighter
+        language={language}
+        style={useDarkTheme ? (oneDark as Record<string, React.CSSProperties>) : (oneLight as Record<string, React.CSSProperties>)}
+        customStyle={{
+          margin: 0,
+          padding: '0.9em 1em',
+          background: 'transparent',
+          fontSize: '0.85rem',
+        }}
+      >
+        {code}
+      </SyntaxHighlighter>
+    </div>
+  );
+}
+
+/** Best-effort: strip markdown formatting for plain-text copy. */
+function stripMarkdown(md: string): string {
+  return md
+    .replace(/```[\s\S]*?```/g, (block) => block.replace(/```\w*\n?/g, '').replace(/```/g, ''))
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/^\s*#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '• ')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }

@@ -7,6 +7,7 @@ import { Sidebar } from '@/components/sidebar';
 import { Composer } from '@/components/composer';
 import { MessageBubble } from '@/components/message-bubble';
 import { CopyrightToggle } from '@/components/copyright-toggle';
+import { WebSearchToggle } from '@/components/web-search-toggle';
 import { ModelBadge } from '@/components/model-badge';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ export default function Page() {
   const conversations = useChatStore((s) => s.conversations);
   const activeId = useChatStore((s) => s.activeId);
   const copyrightFree = useChatStore((s) => s.settings.copyrightFree);
+  const webSearch = useChatStore((s) => s.settings.webSearch);
   const newConversation = useChatStore((s) => s.newConversation);
   const appendMessage = useChatStore((s) => s.appendMessage);
   const updateLastMessage = useChatStore((s) => s.updateLastMessage);
@@ -41,12 +43,16 @@ export default function Page() {
     [conversations, activeId],
   );
 
-  // Vercel AI SDK's useChat hook. We pass the copyright flag as a header
-  // so the backend can branch its system prompt + Wikipedia context.
+  // Vercel AI SDK's useChat hook. We pass the copyright + web-search flags
+  // as headers so the backend can branch its system prompt + context.
+  const extraHeaders: Record<string, string> = {};
+  if (copyrightFree) extraHeaders['X-Copyright-Free'] = 'true';
+  if (webSearch) extraHeaders['X-Web-Search'] = 'true';
+
   const { messages, input, setInput, handleSubmit, append, stop, isLoading, error, reload, setMessages } =
     useChat({
       api: '/api/chat',
-      headers: copyrightFree ? { 'X-Copyright-Free': 'true' } : undefined,
+      headers: Object.keys(extraHeaders).length > 0 ? extraHeaders : undefined,
       // We sync AI SDK messages into our store; useChat still owns the live stream.
       onFinish: (msg) => {
         if (!msg) return;
@@ -172,6 +178,7 @@ export default function Page() {
           <div className="ml-auto flex items-center gap-2">
             <ModelBadge />
             <CopyrightToggle />
+            <WebSearchToggle />
             <ThemeToggle />
           </div>
         </header>

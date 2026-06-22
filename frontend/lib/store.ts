@@ -25,6 +25,7 @@ export interface ChatState {
 
   // Settings actions
   setCopyrightFree: (on: boolean) => void;
+  setWebSearch: (on: boolean) => void;
   setTheme: (theme: Settings['theme']) => void;
   setResolvedModel: (model: string) => void;
   resolvedModel: string;
@@ -32,7 +33,8 @@ export interface ChatState {
 
 const defaultSettings: Settings = {
   copyrightFree: false,
-  theme: 'system',
+  webSearch: false,
+  theme: 'dark',
 };
 
 const createConversation = (): Conversation => {
@@ -118,6 +120,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setCopyrightFree: (on) =>
     set((s) => ({ settings: { ...s.settings, copyrightFree: on } })),
+
+  setWebSearch: (on) =>
+    set((s) => ({ settings: { ...s.settings, webSearch: on } })),
 
   setTheme: (theme) =>
     set((s) => ({ settings: { ...s.settings, theme } })),

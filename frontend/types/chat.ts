@@ -28,6 +28,7 @@ export interface Conversation {
 
 export interface Settings {
   copyrightFree: boolean;
+  webSearch: boolean;
   theme: 'light' | 'dark' | 'system';
 }
 

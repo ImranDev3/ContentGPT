@@ -38,3 +38,9 @@ export const WIKI_CONTEXT_HEADER = (summaries: { title: string; extract: string;
     .join('\n\n');
   return `\n\nThe following public-domain reference material (from Wikipedia, CC BY-SA) is available for grounding factual claims. Cite with [Source: <url>] when you use it:\n\n${blocks}`;
 };
+
+export const WEB_SEARCH_HEADER = `You have access to live web search results for the user's query.
+The snippets below were just retrieved. Use them only as raw material —
+paraphrase aggressively, never copy verbatim, and always cite with the
+numbered bracket like [1] that matches the source. If a snippet looks
+copyrighted, do not quote it directly; describe it in your own words.`;
