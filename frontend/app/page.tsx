@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { Menu, Sparkles, X } from 'lucide-react';
+import { Menu, Sparkles } from 'lucide-react';
 import { Sidebar } from '@/components/sidebar';
 import { Composer } from '@/components/composer';
 import { MessageBubble } from '@/components/message-bubble';
@@ -17,12 +17,13 @@ import { useTheme } from '@/components/theme-provider';
 import { uid } from '@/lib/utils';
 import type { ChatMessage, Conversation, Suggestion } from '@/types/chat';
 import type { CompressedImage } from '@/lib/image';
+import type { QuickAction } from '@/components/quick-actions';
 
 const SUGGESTIONS: Suggestion[] = [
   { id: 's1', title: 'Blog intro', prompt: 'Write a 120-word blog intro about the future of remote work.' },
   { id: 's2', title: 'Tweet thread', prompt: 'Draft a 5-tweet thread explaining how vector databases work.' },
   { id: 's3', title: 'Email', prompt: 'Compose a friendly follow-up email after a sales call.' },
-  { id: 's4', title: 'Code review', prompt: 'Review this function for bugs and suggest improvements: (paste code here).' },
+  { id: 's4', title: 'Code review', prompt: 'Review this TypeScript function for bugs and suggest improvements.' },
 ];
 
 export default function Page() {
@@ -36,39 +37,33 @@ export default function Page() {
   const webSearch = useChatStore((s) => s.settings.webSearch);
   const newConversation = useChatStore((s) => s.newConversation);
   const appendMessage = useChatStore((s) => s.appendMessage);
-  const updateLastMessage = useChatStore((s) => s.updateLastMessage);
 
   const active = useMemo<Conversation | undefined>(
     () => conversations.find((c) => c.id === activeId),
     [conversations, activeId],
   );
 
-  // Vercel AI SDK's useChat hook. We pass the copyright + web-search flags
-  // as headers so the backend can branch its system prompt + context.
   const extraHeaders: Record<string, string> = {};
   if (copyrightFree) extraHeaders['X-Copyright-Free'] = 'true';
   if (webSearch) extraHeaders['X-Web-Search'] = 'true';
 
-  const { messages, input, setInput, handleSubmit, append, stop, isLoading, error, reload, setMessages } =
-    useChat({
-      api: '/api/chat',
-      headers: Object.keys(extraHeaders).length > 0 ? extraHeaders : undefined,
-      // We sync AI SDK messages into our store; useChat still owns the live stream.
-      onFinish: (msg) => {
-        if (!msg) return;
-        const id = uid('msg');
-        appendMessage(activeId, {
-          id,
-          role: 'assistant',
-          content: typeof msg.content === 'string' ? msg.content : extractText(msg.content),
-          createdAt: Date.now(),
-        });
-      },
-    });
+  const { messages, append, stop, isLoading, error, reload, setMessages } = useChat({
+    api: '/api/chat',
+    headers: Object.keys(extraHeaders).length > 0 ? extraHeaders : undefined,
+    onFinish: (msg) => {
+      if (!msg || !active) return;
+      const text = typeof msg.content === 'string' ? msg.content : extractText(msg.content);
+      if (!text) return;
+      appendMessage(active.id, {
+        id: uid('msg'),
+        role: 'assistant',
+        content: text,
+        createdAt: Date.now(),
+      });
+    },
+  });
 
-  // Keep the AI SDK's view of messages in sync with our store on first load
-  // and when switching conversations. This makes the UI the single source of
-  // truth (the store) for the history, and useChat owns the in-flight stream.
+  // Sync the store's conversation history into useChat when switching chats.
   const lastSyncedConvRef = useRef<string | null>(null);
   useEffect(() => {
     if (!active) return;
@@ -79,7 +74,6 @@ export default function Page() {
         role: m.role,
         content: m.content,
         createdAt: new Date(m.createdAt),
-        // Vercel AI SDK v1 expects experimental_attachments separately.
         experimental_attachments: m.attachments?.map((a) => ({
           name: a.name,
           contentType: a.mimeType,
@@ -91,41 +85,75 @@ export default function Page() {
   }, [active, setMessages]);
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [quickActionBusy, setQuickActionBusy] = useState<QuickAction | null>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll on new content.
+  // Auto-scroll on any change to messages or streaming state.
   useEffect(() => {
     const el = messagesScrollRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [messages.length, isLoading]);
+    // Use 'auto' (not 'smooth') during streaming for tightest follow; the
+    // user can still scroll up freely.
+    el.scrollTo({ top: el.scrollHeight, behavior: isLoading ? 'auto' : 'smooth' });
+  }, [messages.length, isLoading, messages[messages.length - 1]?.content]);
 
   async function handleSend(text: string, attachments: CompressedImage[]) {
     if (!active) return;
-
-    const userMsg: ChatMessage = {
+    appendMessage(active.id, {
       id: uid('msg'),
       role: 'user',
       content: text,
       attachments: attachments.length > 0 ? attachments : undefined,
       createdAt: Date.now(),
-    };
-    appendMessage(active.id, userMsg);
-
-    // Build the experimental_attachments for useChat's append().
+    });
     const expAttachments = attachments.map((a) => ({
       name: a.name,
       contentType: a.mimeType,
       url: a.dataUrl,
     }));
-
-    // Use the SDK's append so it streams properly. The store already has
-    // the user message; the assistant reply will be appended via onFinish.
     void append(
       { role: 'user', content: text },
       { experimental_attachments: expAttachments },
     );
-    void setInput('');
+  }
+
+  async function handleQuickAction(action: QuickAction) {
+    if (!active || isLoading) return;
+    // Find the last assistant message to feed it into the quick action.
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+    const lastText = lastAssistant
+      ? typeof lastAssistant.content === 'string'
+        ? lastAssistant.content
+        : extractText(lastAssistant.content)
+      : '';
+    if (!lastText) return;
+
+    const PROMPTS: Record<QuickAction, string> = {
+      paraphrase:
+        'Paraphrase the previous response in fresh wording, keeping the same meaning. Output only the rewritten text — no preamble, no acknowledgment.',
+      shorten:
+        'Shorten the previous response to roughly half its length while preserving the key points. Output only the shortened text — no preamble.',
+      expand:
+        'Expand the previous response with more detail, examples, and explanation. Output only the expanded text — no preamble.',
+      safe:
+        'Rewrite the previous response in copyright-safe mode: original wording only, no verbatim copyrighted excerpts, and cite any public-domain sources with [Source: <url>]. Output only the rewritten text — no preamble.',
+    };
+
+    const instruction = PROMPTS[action];
+    const combined = `${instruction}\n\n---\n\nPrevious response to rewrite:\n${lastText}`;
+
+    setQuickActionBusy(action);
+    try {
+      appendMessage(active.id, {
+        id: uid('msg'),
+        role: 'user',
+        content: `[Quick action: ${action}] ${instruction}`,
+        createdAt: Date.now(),
+      });
+      await append({ role: 'user', content: combined });
+    } finally {
+      setQuickActionBusy(null);
+    }
   }
 
   function handleSuggestion(p: string) {
@@ -136,32 +164,27 @@ export default function Page() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-      {/* Sidebar (desktop) */}
+      {/* Desktop sidebar */}
       <div className="hidden md:block">
         <Sidebar />
       </div>
 
-      {/* Sidebar (mobile drawer) */}
+      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setMobileOpen(false)}
-            aria-hidden
-          />
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} aria-hidden />
           <div className="absolute inset-y-0 left-0">
             <Sidebar onCloseMobile={() => setMobileOpen(false)} />
           </div>
         </div>
       )}
 
-      {/* Main */}
       <main className="flex flex-1 flex-col min-w-0">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/60 px-3 backdrop-blur-md">
+        <header className="flex h-12 shrink-0 items-center gap-2 px-3">
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
+            className="md:hidden -ml-2"
             onClick={() => setMobileOpen(true)}
             aria-label="Open sidebar"
           >
@@ -169,13 +192,13 @@ export default function Page() {
           </Button>
 
           <div className="flex items-center gap-2 md:hidden">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
-              <Sparkles className="h-3.5 w-3.5" />
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
+              <Sparkles className="h-3 w-3" />
             </div>
             <span className="text-sm font-semibold">ContentGPT</span>
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1.5">
             <ModelBadge />
             <CopyrightToggle />
             <WebSearchToggle />
@@ -194,6 +217,8 @@ export default function Page() {
                 onRetry={() => reload()}
                 isLoading={isLoading}
                 error={error}
+                quickActionBusy={quickActionBusy}
+                onQuickAction={handleQuickAction}
               />
             )}
           </div>
@@ -230,34 +255,48 @@ function MessageList({
   isLoading,
   error,
   onRetry,
+  quickActionBusy,
+  onQuickAction,
 }: {
   messages: ReturnType<typeof useChat>['messages'];
   useDarkTheme: boolean;
   isLoading: boolean;
   error: Error | undefined;
   onRetry: () => void;
+  quickActionBusy: QuickAction | null;
+  onQuickAction: (action: QuickAction) => void;
 }) {
   // Hide the trailing empty assistant bubble that useChat emits while streaming.
-  const visible = messages.filter((m) => m.role !== 'assistant' || (typeof m.content === 'string' ? m.content.length > 0 : extractText(m.content).length > 0));
+  const visible = messages.filter(
+    (m) =>
+      m.role !== 'assistant' ||
+      (typeof m.content === 'string' ? m.content.length > 0 : extractText(m.content).length > 0),
+  );
+  const lastIdx = visible.length - 1;
+
   return (
     <div className="flex flex-col">
       {visible.map((m, idx) => {
-        const isLast = idx === visible.length - 1;
+        const isLast = idx === lastIdx;
         const text = typeof m.content === 'string' ? m.content : extractText(m.content);
         return (
-          <MessageBubble
-            key={m.id}
-            message={{
-              id: m.id,
-              role: m.role as ChatMessage['role'],
-              content: text,
-              createdAt: (m as { createdAt?: Date | number }).createdAt instanceof Date
-                ? ((m as { createdAt: Date }).createdAt.getTime())
-                : Date.now(),
-            }}
-            isStreaming={isLoading && isLast && m.role === 'assistant'}
-            useDarkTheme={useDarkTheme}
-          />
+          <div key={m.id} className="animate-msg-in">
+            <MessageBubble
+              message={{
+                id: m.id,
+                role: m.role as ChatMessage['role'],
+                content: text,
+                createdAt: (m as { createdAt?: Date | number }).createdAt instanceof Date
+                  ? (m as { createdAt: Date }).createdAt.getTime()
+                  : Date.now(),
+              }}
+              isStreaming={isLoading && isLast && m.role === 'assistant'}
+              useDarkTheme={useDarkTheme}
+              isLast={isLast}
+              quickActionBusy={quickActionBusy}
+              onQuickAction={onQuickAction}
+            />
+          </div>
         );
       })}
       {error && (
@@ -285,7 +324,7 @@ function EmptyState({ onSuggestion }: { onSuggestion: (p: string) => void }) {
       <h1 className="text-2xl font-semibold tracking-tight">How can I help you write today?</h1>
       <p className="mt-1 max-w-md text-sm text-muted-foreground">
         Pick a starting point, or type your own prompt below. Toggle the shield to ground answers
-        in public-domain sources.
+        in public-domain sources, or the globe for live web search.
       </p>
 
       <div className="mt-6 grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
@@ -293,7 +332,7 @@ function EmptyState({ onSuggestion }: { onSuggestion: (p: string) => void }) {
           <button
             key={s.id}
             onClick={() => onSuggestion(s.prompt)}
-            className="group/sg flex flex-col items-start gap-1 rounded-xl border border-border bg-background/70 px-4 py-3 text-left transition-colors hover:border-primary/40 hover:bg-accent"
+            className="group/sg flex flex-col items-start gap-1 rounded-xl border border-border/60 bg-card/40 px-4 py-3 text-left transition-colors hover:border-primary/40 hover:bg-accent"
           >
             <span className="text-sm font-medium">{s.title}</span>
             <span className="text-xs text-muted-foreground line-clamp-2">{s.prompt}</span>
@@ -303,5 +342,3 @@ function EmptyState({ onSuggestion }: { onSuggestion: (p: string) => void }) {
     </div>
   );
 }
-
-void X;

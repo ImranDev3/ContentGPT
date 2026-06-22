@@ -9,14 +9,25 @@ import { oneDark, oneLight } from 'react-syntax-highlighter/dist/cjs/styles/pris
 import { Check, Copy, FileText, User, Bot } from 'lucide-react';
 import type { ChatMessage } from '@/types/chat';
 import { cn } from '@/lib/utils';
+import { QuickActions, type QuickAction } from '@/components/quick-actions';
 
 interface MessageBubbleProps {
   message: ChatMessage;
   isStreaming?: boolean;
   useDarkTheme: boolean;
+  isLast?: boolean;
+  quickActionBusy?: QuickAction | null;
+  onQuickAction?: (action: QuickAction) => void;
 }
 
-export function MessageBubble({ message, isStreaming, useDarkTheme }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  isStreaming,
+  useDarkTheme,
+  isLast,
+  quickActionBusy,
+  onQuickAction,
+}: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
   return (
@@ -53,7 +64,7 @@ export function MessageBubble({ message, isStreaming, useDarkTheme }: MessageBub
             isUser
               ? 'bg-primary text-primary-foreground rounded-tr-sm'
               : 'bg-muted text-foreground rounded-tl-sm',
-            isStreaming && 'animate-pulse-subtle',
+            isStreaming && 'stream-cursor',
           )}
         >
           {isUser ? (
@@ -96,7 +107,16 @@ export function MessageBubble({ message, isStreaming, useDarkTheme }: MessageBub
         </div>
 
         {!isUser && message.content && !isStreaming && (
-          <MessageActions content={message.content} />
+          <div className="flex flex-col gap-1.5">
+            <MessageActions content={message.content} />
+            {isLast && onQuickAction && (
+              <QuickActions
+                onAction={onQuickAction}
+                busy={quickActionBusy ?? null}
+                disabled={quickActionBusy !== null}
+              />
+            )}
+          </div>
         )}
       </div>
 

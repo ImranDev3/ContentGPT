@@ -25,30 +25,35 @@ export function ModelBadge() {
     };
   }, [setResolvedModel]);
 
-  const label = state?.ok
-    ? state.model || stored || 'model'
-    : state?.error
-      ? 'offline'
-      : 'connecting…';
-
-  const SubIcon = state?.ok ? Cpu : Loader2;
+  const ready = state?.ok;
+  const modelLabel = ready ? state?.model || stored || 'manifest' : null;
+  const latency = ready ? state?.latencyMs ?? 0 : 0;
 
   return (
     <div
       className={cn(
-        'flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-2.5 py-1 text-[11px]',
-        state?.ok
+        'flex items-center gap-1.5 rounded-full border border-border/60 bg-background/40 px-2.5 py-1 text-[11px]',
+        ready
           ? 'text-foreground'
-          : state
+          : state && !ready
             ? 'text-destructive'
             : 'text-muted-foreground',
       )}
-      title={state?.ok ? `latency ${state.latencyMs}ms` : state?.error ?? 'Probing Manifest…'}
+      title={
+        ready
+          ? `Resolved model: ${modelLabel}\nProvider: Manifest.build\nLatency: ${latency}ms`
+          : state?.error ?? 'Probing Manifest…'
+      }
     >
-      <SubIcon className={cn('h-3 w-3', !state && 'animate-spin')} />
-      <span className="font-mono tracking-tight">{label}</span>
-      {state?.ok && state.latencyMs > 0 && (
-        <span className="text-muted-foreground">· {state.latencyMs}ms</span>
+      {ready ? <Cpu className="h-3 w-3" /> : <Loader2 className="h-3 w-3 animate-spin" />}
+      <span className="font-mono tracking-tight">
+        {ready ? modelLabel : state && !ready ? 'offline' : 'connecting…'}
+      </span>
+      {ready && latency > 0 && (
+        <>
+          <span className="text-muted-foreground/60">·</span>
+          <span className="text-muted-foreground">{latency}ms</span>
+        </>
       )}
     </div>
   );

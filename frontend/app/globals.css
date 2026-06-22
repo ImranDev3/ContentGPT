@@ -30,29 +30,30 @@
     --sidebar-border: 240 5.9% 90%;
   }
 
+  /* OLED-style dark: true black with subtle warm tints. */
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --background: 0 0% 4%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 96%;
     --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
+    --primary-foreground: 0 0% 6%;
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 0 0% 13%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
+    --ring: 0 0% 80%;
 
-    --sidebar-bg: 240 10% 5% / 0.7;
-    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-bg: 0 0% 6% / 0.85;
+    --sidebar-border: 0 0% 14%;
   }
 }
 
@@ -102,8 +103,8 @@
 
   /* Subtle mac-style scrollbar */
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
@@ -120,6 +121,28 @@
     border: 2px solid transparent;
   }
 }
+
+/* Smooth fade-in for new messages */
+@keyframes msg-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-msg-in { animation: msg-fade-in 180ms ease-out both; }
+
+/* Subtle streaming cursor on the trailing message */
+@keyframes stream-cursor {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 1; }
+}
+.stream-cursor::after {
+  content: '▍';
+  margin-left: 1px;
+  color: hsl(var(--muted-foreground));
+  animation: stream-cursor 1s ease-in-out infinite;
+}
+
+/* Smooth-toggle transitions for theme/dark switches */
+html { transition: background-color 200ms ease, color 200ms ease; }
 
 /* Markdown content styling for assistant bubbles */
 .prose-content {
