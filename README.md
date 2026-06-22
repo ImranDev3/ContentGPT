@@ -80,12 +80,52 @@ npm run dev:frontend
 npm run build
 ```
 
-## Deployment
+## Deployment (free)
 
-- **Frontend** → [Vercel](https://vercel.com) (Next.js native)
-- **Backend** → any Node host ([Render](https://render.com), [Railway](https://railway.app), [Fly.io](https://fly.io))
+The easiest path is Vercel for the frontend + Render for the backend. The repo
+includes a `render.yaml` blueprint so the backend is one-click on Render.
 
-Set `MANIFEST_API_KEY` in your host's environment. Update the rewrite destination in `frontend/next.config.mjs` to your backend's production URL.
+### 1. Backend → Render (free tier)
+
+1. Sign up at [render.com](https://render.com) (use GitHub login).
+2. Click **New +** → **Blueprint** → connect the `ImranDev3/ContentGPT` repo.
+3. Render reads `render.yaml` and provisions the `contentgpt-backend` service.
+4. In the service's **Environment** tab, set `MANIFEST_API_KEY` to your real
+   Manifest key. (The other env vars have safe defaults baked into `render.yaml`.)
+5. Click **Apply**. First deploy takes ~2 min. The service URL is
+   `https://contentgpt-backend.onrender.com`.
+
+> Free tier note: Render spins down after 15 min of inactivity. The first
+> request after idle takes 30–50 s to wake up — the UI shows a "Connecting…"
+> state during that time, then streams normally.
+
+### 2. Frontend → Vercel (free)
+
+1. Sign up at [vercel.com](https://vercel.com) (use GitHub login).
+2. **Add New…** → **Project** → import `ImranDev3/ContentGPT`.
+3. Set **Root Directory** = `frontend`.
+4. Add an environment variable `LAN_HOST` = the backend host (e.g.
+   `contentgpt-backend.onrender.com`, no `https://`, no port). This lets
+   the Next.js rewrite proxy `/api/*` to your production backend.
+5. Click **Deploy**. Your app is live at `https://contentgpt-<hash>.vercel.app`
+   with free HTTPS and a custom-domain option.
+
+### 3. Test
+
+Open the Vercel URL in any browser. The chat streams end-to-end through
+the Render backend to Manifest.
+
+### Alternative: single platform on Render
+
+If you prefer to keep everything on Render, you can host the Next.js frontend
+as a separate static site + web service in the same `render.yaml`. The
+trade-off is slower builds and less idiomatic Next.js hosting.
+
+### Alternative: always-on backend
+
+If the 30–50 s cold start on Render's free tier is annoying, swap the backend
+for [Railway](https://railway.app) (free $5/mo credit) or
+[Fly.io](https://fly.io) (3 shared VMs free). Both stay warm.
 
 ## Tech stack
 
