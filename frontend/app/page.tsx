@@ -6,10 +6,7 @@ import { Menu, Sparkles } from 'lucide-react';
 import { Sidebar } from '@/components/sidebar';
 import { Composer } from '@/components/composer';
 import { MessageBubble } from '@/components/message-bubble';
-import { CopyrightToggle } from '@/components/copyright-toggle';
-import { WebSearchToggle } from '@/components/web-search-toggle';
-import { ModelBadge } from '@/components/model-badge';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { SettingsPopover } from '@/components/settings-popover';
 import { Button } from '@/components/ui/button';
 import { useChatStore } from '@/lib/store';
 import { useHydrateStore } from '@/lib/persist';
@@ -191,18 +188,19 @@ export default function Page() {
             <Menu className="h-4 w-4" />
           </Button>
 
-          <div className="flex items-center gap-2 md:hidden">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
-              <Sparkles className="h-3 w-3" />
+          <div className="flex-1 flex items-center justify-center min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="hidden md:flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
+                <Sparkles className="h-3 w-3" />
+              </div>
+              <span className="truncate text-sm font-medium text-foreground/90">
+                {active?.title?.trim() && active.title !== 'New chat' ? active.title : 'New chat'}
+              </span>
             </div>
-            <span className="text-sm font-semibold">ContentGPT</span>
           </div>
 
-          <div className="ml-auto flex items-center gap-1.5">
-            <ModelBadge />
-            <CopyrightToggle />
-            <WebSearchToggle />
-            <ThemeToggle />
+          <div className="flex items-center gap-1">
+            <SettingsPopover />
           </div>
         </header>
 

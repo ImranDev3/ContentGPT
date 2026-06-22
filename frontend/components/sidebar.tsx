@@ -96,7 +96,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
       </ScrollArea>
 
       <div className="border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
-        Manifest.build · OpenAI-compatible
+        ContentGPT
       </div>
     </aside>
   );

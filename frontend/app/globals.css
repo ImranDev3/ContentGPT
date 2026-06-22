@@ -30,30 +30,30 @@
     --sidebar-border: 240 5.9% 90%;
   }
 
-  /* OLED-style dark: true black with subtle warm tints. */
+  /* OLED-style dark: true pure black. */
   .dark {
-    --background: 0 0% 4%;
+    --background: 0 0% 0%;
     --foreground: 0 0% 96%;
-    --card: 0 0% 6%;
+    --card: 0 0% 4%;
     --card-foreground: 0 0% 96%;
     --popover: 0 0% 6%;
     --popover-foreground: 0 0% 96%;
     --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 6%;
-    --secondary: 0 0% 11%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 8%;
     --secondary-foreground: 0 0% 96%;
-    --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 64%;
-    --accent: 0 0% 13%;
+    --muted: 0 0% 7%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 10%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14%;
-    --input: 0 0% 14%;
+    --border: 0 0% 12%;
+    --input: 0 0% 12%;
     --ring: 0 0% 80%;
 
-    --sidebar-bg: 0 0% 6% / 0.85;
-    --sidebar-border: 0 0% 14%;
+    --sidebar-bg: 0 0% 0% / 0.95;
+    --sidebar-border: 0 0% 12%;
   }
 }
 
