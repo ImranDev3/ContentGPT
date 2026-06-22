@@ -1,0 +1,19 @@
+{
+  "name": "contentgpt",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ContentGPT — a fast, clean, Mac-style AI content chatbot powered by Manifest.build",
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c blue,green \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "start": "concurrently -n backend,frontend -c blue,green \"npm --prefix backend run start\" \"npm --prefix frontend run start\"",
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
+    "clean": "rimraf backend/dist frontend/.next"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "rimraf": "^6.0.1"
+  }
+}
